@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><title>Dashboard</title></head>
+<body>
+    <h2>Pronostici disponibili</h2>
+    {% for bet in bets %}
+        <p><strong>{{ bet.type }}</strong>: {{ bet.description }}</p>
+    {% endfor %}
+    <a href="{{ url_for('logout') }}">Logout</a>
+    {% if session.get('is_admin') %}
+        <a href="{{ url_for('admin') }}">Area Admin</a>
+    {% endif %}
+</body>
+</html>

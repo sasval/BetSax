@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><title>Admin - BetSax</title></head>
+<body>
+    <h2>Pubblica nuova giocata</h2>
+    <form method="POST">
+        <input name="type" placeholder="Tipo (singola/multipla)" required><br>
+        <textarea name="description" placeholder="Descrizione della giocata" required></textarea><br>
+        <button type="submit">Pubblica</button>
+    </form>
+    <h3>Giocate precedenti</h3>
+    {% for bet in bets %}
+        <p><strong>{{ bet.type }}</strong>: {{ bet.description }}</p>
+    {% endfor %}
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>
