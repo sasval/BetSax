@@ -1,62 +1,71 @@
-from flask import Flask, render_template, redirect, url_for, request, session, flash
-from models import db, User, Bet
-from werkzeug.security import generate_password_hash, check_password_hash
-import os
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
+from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
-app.config['SECRET_KEY'] = 'your_secret_key'
-db.init_app(app)
+CORS(app)
 
-@app.before_first_request
-def create_tables():
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///betsax.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+class Prediction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.String(10), nullable=False)
+    match = db.Column(db.String(100), nullable=False)
+    tip = db.Column(db.String(10), nullable=False)
+    result = db.Column(db.String(10), nullable=True)
+
+with app.app_context():
     db.create_all()
 
-@app.route('/')
-def index():
-    if 'user_id' in session:
-        bets = Bet.query.order_by(Bet.id.desc()).all()
-        return render_template('dashboard.html', bets=bets)
-    return redirect(url_for('login'))
+@app.route('/api/predictions', methods=['GET'])
+def get_predictions():
+    predictions = Prediction.query.all()
+    return jsonify([{
+        'id': p.id,
+        'date': p.date,
+        'match': p.match,
+        'tip': p.tip,
+        'result': p.result
+    } for p in predictions])
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user = User.query.filter_by(email=request.form['email']).first()
-        if user and check_password_hash(user.password, request.form['password']):
-            session['user_id'] = user.id
-            session['is_admin'] = user.is_admin
-            return redirect(url_for('index'))
-        flash('Credenziali non valide')
-    return render_template('login.html')
+@app.route('/api/predictions', methods=['POST'])
+def add_prediction():
+    data = request.json
+    prediction = Prediction(
+        date=data['date'],
+        match=data['match'],
+        tip=data['tip'],
+        result=data.get('result')
+    )
+    db.session.add(prediction)
+    db.session.commit()
+    return jsonify({'message': 'Prediction added successfully!'}), 201
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        hashed_pw = generate_password_hash(request.form['password'], method='sha256')
-        new_user = User(email=request.form['email'], password=hashed_pw)
-        db.session.add(new_user)
-        db.session.commit()
-        flash('Registrazione completata. Accedi ora.')
-        return redirect(url_for('login'))
-    return render_template('register.html')
+@app.route('/api/predictions/<int:id>', methods=['PUT'])
+def update_prediction(id):
+    prediction = Prediction.query.get(id)
+    if not prediction:
+        return jsonify({'message': 'Prediction not found'}), 404
+    data = request.json
+    prediction.date = data['date']
+    prediction.match = data['match']
+    prediction.tip = data['tip']
+    prediction.result = data.get('result')
+    db.session.commit()
+    return jsonify({'message': 'Prediction updated successfully!'})
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
-
-@app.route('/admin', methods=['GET', 'POST'])
-def admin():
-    if not session.get('is_admin'):
-        return redirect(url_for('index'))
-    if request.method == 'POST':
-        new_bet = Bet(type=request.form['type'], description=request.form['description'])
-        db.session.add(new_bet)
-        db.session.commit()
-        flash('Giocata aggiunta!')
-    bets = Bet.query.order_by(Bet.id.desc()).all()
-    return render_template('admin.html', bets=bets)
+@app.route('/api/predictions/<int:id>', methods=['DELETE'])
+def delete_prediction(id):
+    prediction = Prediction.query.get(id)
+    if not prediction:
+        return jsonify({'message': 'Prediction not found'}), 404
+    db.session.delete(prediction)
+    db.session.commit()
+    return jsonify({'message': 'Prediction deleted successfully!'})
 
 if __name__ == '__main__':
     app.run(debug=True)
+
